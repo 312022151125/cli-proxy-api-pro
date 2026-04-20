@@ -62,8 +62,8 @@ if git ls-remote --exit-code --tags origin "refs/tags/${UPSTREAM_TAG}" >/dev/nul
 fi
 
 set_step "fetch-refs"
-git fetch --prune --tags upstream
-git fetch --prune --tags origin
+git fetch --prune upstream main
+git fetch --prune origin
 
 set_step "refresh-upstream-main"
 git checkout -B upstream-main upstream/main
