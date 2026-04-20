@@ -36,6 +36,12 @@ set_step() {
   echo "[sync-upstream-release] ${FAILED_STEP}"
 }
 
+UPSTREAM_REPO_URL="${UPSTREAM_REPO_URL:-https://github.com/router-for-me/CLIProxyAPI.git}"
+
+if ! git remote get-url upstream >/dev/null 2>&1; then
+  git remote add upstream "${UPSTREAM_REPO_URL}"
+fi
+
 set_step "lookup-upstream-tag"
 UPSTREAM_TAG="$(git ls-remote --tags --refs upstream | awk '{print $2}' | sed 's#refs/tags/##' | sort -V | tail -n1)"
 if [[ -z "${UPSTREAM_TAG}" ]]; then

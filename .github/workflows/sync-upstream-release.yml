@@ -87,9 +87,17 @@ jobs:
               `- workflow_run: ${runUrl}`,
             ].join("\n");
 
-            await github.rest.issues.create({
-              owner,
-              repo,
-              title,
-              body,
-            });
+            try {
+              await github.rest.issues.create({
+                owner,
+                repo,
+                title,
+                body,
+              });
+            } catch (error) {
+              if (error.status === 410) {
+                core.warning(`Issues disabled in ${owner}/${repo}; skip failure issue creation.`);
+                return;
+              }
+              throw error;
+            }
