@@ -16,6 +16,16 @@ go build -o test-output ./cmd/server && rm test-output # Verify compile (REQUIRE
 ```
 - Common flags: `--config <path>`, `--tui`, `--standalone`, `--local-model`, `--no-browser`, `--oauth-callback-port <port>`
 
+## Fork Development Flow
+- `upstream-main` mirrors upstream `main` only and must not carry fork-specific commits.
+- `main` keeps only fork release automation and other intentionally long-lived fork maintenance changes.
+- Start new feature work from `upstream-main` on `feature/<name>` and never develop directly on `main`.
+- Move a change into `feature-overlay` only when it is confirmed as a long-term fork delta that should survive upstream syncs.
+- Sync upstream releases only through `sync-upstream-release.yml`, not by manual branch mixing.
+- Check `main` and `feature-overlay` for unexpected commits before publishing a release.
+- Fork tags and releases must reuse upstream tag names so downstream automation can follow one version line.
+- `containers` must follow fork releases through Renovate and must not pin a source branch name.
+
 ## Config
 - Default config: `config.yaml` (template: `config.example.yaml`)
 - `.env` is auto-loaded from the working directory
