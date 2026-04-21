@@ -270,6 +270,25 @@ func codexWarmupToFloat64(v any) float64 {
 	return -1
 }
 
+// codexWarmupRequestBody is the minimal Codex Responses API request used for quota warmup.
+type codexWarmupRequestBody struct {
+	Model        string               `json:"model"`
+	Stream       bool                 `json:"stream"`
+	Instructions string               `json:"instructions"`
+	Input        []codexWarmupMessage `json:"input"`
+}
+
+type codexWarmupMessage struct {
+	Type    string               `json:"type"`
+	Role    string               `json:"role"`
+	Content []codexWarmupContent `json:"content"`
+}
+
+type codexWarmupContent struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
 // sendCodexWarmupRequest sends a minimal request to gpt-5.4-mini to activate the weekly quota.
 func (h *Handler) sendCodexWarmupRequest(ctx context.Context, auth *coreauth.Auth, token string) error {
 	baseURL := codexWarmupBaseURL
@@ -280,19 +299,16 @@ func (h *Handler) sendCodexWarmupRequest(ctx context.Context, auth *coreauth.Aut
 	}
 	responsesURL := strings.TrimSuffix(baseURL, "/") + "/responses"
 
-	warmupBody := map[string]any{
-		"model":        codexWarmupModel,
-		"stream":       false,
-		"instructions": "",
-		"input": []any{
-			map[string]any{
-				"type": "message",
-				"role": "user",
-				"content": []any{
-					map[string]any{
-						"type": "input_text",
-						"text": "hi",
-					},
+	warmupBody := codexWarmupRequestBody{
+		Model:        codexWarmupModel,
+		Stream:       false,
+		Instructions: "",
+		Input: []codexWarmupMessage{
+			{
+				Type: "message",
+				Role: "user",
+				Content: []codexWarmupContent{
+					{Type: "input_text", Text: "hi"},
 				},
 			},
 		},
