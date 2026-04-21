@@ -324,6 +324,24 @@ func (h *Handler) GetRoutingWarmup(c *gin.Context) {
 func (h *Handler) PutRoutingWarmup(c *gin.Context) {
 	h.updateBoolField(c, func(v bool) { h.cfg.Routing.Warmup = v })
 }
+func (h *Handler) RunRoutingWarmup(c *gin.Context) {
+	if h == nil || h.warmupListener == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "warmup unavailable"})
+		return
+	}
+	if !h.warmupListener.isWarmupEnabled() {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "routing warmup is disabled"})
+		return
+	}
+
+	attempted, succeeded, failed := h.warmupListener.RunWarmupAll(c.Request.Context())
+	c.JSON(http.StatusOK, gin.H{
+		"status":    "ok",
+		"attempted": attempted,
+		"succeeded": succeeded,
+		"failed":    failed,
+	})
+}
 
 // Proxy URL
 func (h *Handler) GetProxyURL(c *gin.Context) { c.JSON(200, gin.H{"proxy-url": h.cfg.ProxyURL}) }

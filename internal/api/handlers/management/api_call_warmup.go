@@ -464,3 +464,30 @@ func (l *WarmupListener) OnManagementAPICall(ctx context.Context, evt Management
 		l.markSourceWarmed(sourceAuthIndex)
 	}
 }
+
+func (l *WarmupListener) RunWarmupAll(ctx context.Context) (attempted int, succeeded int, failed []string) {
+	manager := l.currentAuthManager()
+	if l == nil || !l.isWarmupEnabled() || manager == nil {
+		return 0, 0, nil
+	}
+
+	targets := l.collectWarmupTargets(manager.List(), "")
+	failed = make([]string, 0)
+	for _, target := range targets {
+		model := selectWarmupModel(target.ID)
+		if strings.TrimSpace(model) == "" {
+			failed = append(failed, fmt.Sprintf("%s: no warmup model", target.ID))
+			continue
+		}
+
+		attempted++
+		if err := l.executeWarmup(ctx, target, model); err != nil {
+			log.WithError(err).Warnf("management routing warmup run failed for auth %s", target.ID)
+			failed = append(failed, fmt.Sprintf("%s: %v", target.ID, err))
+			continue
+		}
+		succeeded++
+	}
+
+	return attempted, succeeded, failed
+}
