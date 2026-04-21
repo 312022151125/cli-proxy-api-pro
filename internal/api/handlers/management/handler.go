@@ -48,6 +48,8 @@ type Handler struct {
 	envSecret           string
 	logDir              string
 	postAuthHook        coreauth.PostAuthHook
+	apiCallEvents       *managementAPICallEventBus
+	warmupListener      *WarmupListener
 }
 
 // NewHandler creates a new management handler instance.
@@ -64,6 +66,11 @@ func NewHandler(cfg *config.Config, configFilePath string, manager *coreauth.Man
 		tokenStore:          sdkAuth.GetTokenStore(),
 		allowRemoteOverride: envSecret != "",
 		envSecret:           envSecret,
+		apiCallEvents:       newManagementAPICallEventBus(),
+	}
+	if manager != nil {
+		h.warmupListener = NewWarmupListener(cfg, manager)
+		h.RegisterManagementAPICallListener(h.warmupListener)
 	}
 	h.startAttemptCleanup()
 	return h
@@ -105,10 +112,43 @@ func NewHandlerWithoutConfigFilePath(cfg *config.Config, manager *coreauth.Manag
 }
 
 // SetConfig updates the in-memory config reference when the server hot-reloads.
-func (h *Handler) SetConfig(cfg *config.Config) { h.cfg = cfg }
+func (h *Handler) SetConfig(cfg *config.Config) {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	h.cfg = cfg
+	warmupListener := h.warmupListener
+	h.mu.Unlock()
+	if warmupListener != nil {
+		warmupListener.setConfig(cfg)
+	}
+}
 
 // SetAuthManager updates the auth manager reference used by management endpoints.
-func (h *Handler) SetAuthManager(manager *coreauth.Manager) { h.authManager = manager }
+func (h *Handler) SetAuthManager(manager *coreauth.Manager) {
+	if h == nil {
+		return
+	}
+	createdWarmupListener := false
+	h.mu.Lock()
+	h.authManager = manager
+	warmupListener := h.warmupListener
+	cfg := h.cfg
+	if warmupListener == nil && manager != nil {
+		warmupListener = NewWarmupListener(cfg, manager)
+		h.warmupListener = warmupListener
+		createdWarmupListener = true
+	}
+	h.mu.Unlock()
+	if warmupListener == nil {
+		return
+	}
+	warmupListener.setAuthManager(manager)
+	if createdWarmupListener {
+		h.RegisterManagementAPICallListener(warmupListener)
+	}
+}
 
 // SetUsageStatistics allows replacing the usage statistics reference.
 func (h *Handler) SetUsageStatistics(stats *usage.RequestStatistics) { h.usageStats = stats }
@@ -132,6 +172,14 @@ func (h *Handler) SetLogDirectory(dir string) {
 // SetPostAuthHook registers a hook to be called after auth record creation but before persistence.
 func (h *Handler) SetPostAuthHook(hook coreauth.PostAuthHook) {
 	h.postAuthHook = hook
+}
+
+// RegisterManagementAPICallListener registers a listener for management /api-call events.
+func (h *Handler) RegisterManagementAPICallListener(listener ManagementAPICallListener) {
+	if h == nil || h.apiCallEvents == nil {
+		return
+	}
+	h.apiCallEvents.Register(listener)
 }
 
 // Middleware enforces access control for management endpoints.
@@ -276,6 +324,12 @@ func (h *Handler) Middleware() gin.HandlerFunc {
 func (h *Handler) persist(c *gin.Context) bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	return h.persistLocked(c)
+}
+
+// persistLocked saves the current in-memory config to disk.
+// It expects the caller to hold h.mu.
+func (h *Handler) persistLocked(c *gin.Context) bool {
 	// Preserve comments when writing
 	if err := config.SaveConfigPreserveComments(h.configFilePath, h.cfg); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to save config: %v", err)})

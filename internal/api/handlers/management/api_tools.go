@@ -278,6 +278,18 @@ func (h *Handler) APICall(c *gin.Context) {
 	} else {
 		c.JSON(http.StatusOK, response)
 	}
+
+	if h != nil && h.apiCallEvents != nil {
+		eventCtx := context.WithoutCancel(c.Request.Context())
+		h.apiCallEvents.Publish(eventCtx, ManagementAPICallEvent{
+			AuthIndex:  authIndex,
+			Method:     method,
+			URL:        urlStr,
+			StatusCode: resp.StatusCode,
+			RespHeader: resp.Header.Clone(),
+			RespBody:   append([]byte(nil), respBody...),
+		})
+	}
 }
 
 func firstNonEmptyString(values ...*string) string {
@@ -682,17 +694,7 @@ func (h *Handler) authByIndex(authIndex string) *coreauth.Auth {
 	if authIndex == "" || h == nil || h.authManager == nil {
 		return nil
 	}
-	auths := h.authManager.List()
-	for _, auth := range auths {
-		if auth == nil {
-			continue
-		}
-		auth.EnsureIndex()
-		if auth.Index == authIndex {
-			return auth
-		}
-	}
-	return nil
+	return findAuthByStableIndex(h.authManager.List(), authIndex)
 }
 
 func (h *Handler) apiCallTransport(auth *coreauth.Auth) http.RoundTripper {
