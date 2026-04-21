@@ -31,8 +31,8 @@ func ConvertOpenAIRequestToCodex(modelName string, inputRawJSON []byte, stream b
 	// Start with empty JSON object
 	out := []byte(`{"instructions":""}`)
 
-	// Stream must be set to true
-	out, _ = sjson.SetBytes(out, "stream", stream)
+	// Codex Responses requires stream=true.
+	out, _ = sjson.SetBytes(out, "stream", true)
 
 	// Codex not support temperature, top_p, top_k, max_output_tokens, so comment them
 	// if v := gjson.GetBytes(rawJSON, "temperature"); v.Exists() {
