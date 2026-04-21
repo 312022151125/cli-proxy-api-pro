@@ -320,7 +320,7 @@ func (h *Handler) sendCodexWarmupRequest(ctx context.Context, auth *coreauth.Aut
 	warmupBody := codexWarmupRequestBody{
 		Model:        codexWarmupModel,
 		Stream:       true,
-		Store:        true,
+		Store:        false,
 		Instructions: "",
 		Input: []codexWarmupMessage{
 			{
