@@ -211,10 +211,12 @@ func (h *Handler) checkCodexWeeklyQuotaUsed(ctx context.Context, auth *coreauth.
 // made in the current period (quota is below 100%). Returns false when usage is zero
 // (quota is still at 100%).
 func parseCodexQuotaUsed(body []byte) bool {
-	// usedCountFields lists JSON field names that represent the number of requests already
-	// consumed in the current period. A zero value means the quota has not been used yet.
+	// usedCountFields lists JSON field names that unambiguously represent the number of
+	// requests already consumed in the current period. Ambiguous names like "requests" or
+	// "count" are intentionally excluded because they may refer to the quota limit rather
+	// than the amount consumed. A zero value means the quota has not been used yet.
 	usedCountFields := []string{
-		"period_requests", "requests", "request_count", "count",
+		"period_requests_used",
 		"requests_used", "weekly_requests_used", "five_hour_requests_used",
 		"used", "weekly_used", "five_hour_used",
 		"tokens_used", "weekly_tokens_used",
@@ -291,7 +293,7 @@ func codexWarmupToFloat64(v any) float64 {
 type codexWarmupRequestBody struct {
 	Model        string               `json:"model"`
 	Stream       bool                 `json:"stream"`
-	Store        bool                 `json:"store"`
+	Store        *bool                `json:"store,omitempty"`
 	Instructions string               `json:"instructions"`
 	Input        []codexWarmupMessage `json:"input"`
 }
@@ -320,7 +322,6 @@ func (h *Handler) sendCodexWarmupRequest(ctx context.Context, auth *coreauth.Aut
 	warmupBody := codexWarmupRequestBody{
 		Model:        codexWarmupModel,
 		Stream:       true,
-		Store:        false,
 		Instructions: "",
 		Input: []codexWarmupMessage{
 			{
