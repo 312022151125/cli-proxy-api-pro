@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
@@ -21,7 +20,6 @@ const (
 	codexWarmupModel      = "gpt-5.4-mini"
 	codexWarmupUserAgent  = "codex-tui/0.118.0 (Mac OS 26.3.1; arm64) iTerm.app/3.6.9 (codex-tui; 0.118.0)"
 	codexWarmupOriginator = "codex-tui"
-	codexWarmupTimeout    = 30 * time.Second
 )
 
 type codexWarmupResult struct {
@@ -179,8 +177,10 @@ func (h *Handler) checkCodexWeeklyQuotaUsed(ctx context.Context, auth *coreauth.
 	}
 	applyCodexWarmupHeaders(req, auth, token, false)
 
+	// Use the same timeout as other management API calls (intentional exception for management endpoints,
+	// consistent with defaultAPICallTimeout used in api_tools.go).
 	httpClient := &http.Client{
-		Timeout:   codexWarmupTimeout,
+		Timeout:   defaultAPICallTimeout,
 		Transport: h.apiCallTransport(auth),
 	}
 
@@ -308,8 +308,10 @@ func (h *Handler) sendCodexWarmupRequest(ctx context.Context, auth *coreauth.Aut
 	}
 	applyCodexWarmupHeaders(req, auth, token, false)
 
+	// Use the same timeout as other management API calls (intentional exception for management endpoints,
+	// consistent with defaultAPICallTimeout used in api_tools.go).
 	httpClient := &http.Client{
-		Timeout:   codexWarmupTimeout,
+		Timeout:   defaultAPICallTimeout,
 		Transport: h.apiCallTransport(auth),
 	}
 
