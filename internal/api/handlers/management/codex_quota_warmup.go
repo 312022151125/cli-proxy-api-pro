@@ -319,7 +319,8 @@ func (h *Handler) sendCodexWarmupRequest(ctx context.Context, auth *coreauth.Aut
 
 	warmupBody := codexWarmupRequestBody{
 		Model:        codexWarmupModel,
-		Stream:       false,
+		Stream:       true,
+		Store:        true,
 		Instructions: "",
 		Input: []codexWarmupMessage{
 			{
@@ -340,7 +341,7 @@ func (h *Handler) sendCodexWarmupRequest(ctx context.Context, auth *coreauth.Aut
 	if errReq != nil {
 		return fmt.Errorf("build request: %w", errReq)
 	}
-	applyCodexWarmupHeaders(req, auth, token, false)
+	applyCodexWarmupHeaders(req, auth, token, true)
 
 	// Use the same timeout as other management API calls (intentional exception for management endpoints,
 	// consistent with defaultAPICallTimeout used in api_tools.go).
