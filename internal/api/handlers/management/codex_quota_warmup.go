@@ -274,6 +274,7 @@ func codexWarmupToFloat64(v any) float64 {
 type codexWarmupRequestBody struct {
 	Model        string               `json:"model"`
 	Stream       bool                 `json:"stream"`
+	Store        bool                 `json:"store"`
 	Instructions string               `json:"instructions"`
 	Input        []codexWarmupMessage `json:"input"`
 }
