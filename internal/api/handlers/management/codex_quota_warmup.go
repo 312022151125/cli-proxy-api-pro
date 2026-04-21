@@ -211,45 +211,62 @@ func (h *Handler) checkCodexWeeklyQuotaUsed(ctx context.Context, auth *coreauth.
 // made in the current period (quota is below 100%). Returns false when usage is zero
 // (quota is still at 100%).
 func parseCodexQuotaUsed(body []byte) bool {
+	// usedCountFields lists JSON field names that represent the number of requests already
+	// consumed in the current period. A zero value means the quota has not been used yet.
+	usedCountFields := []string{
+		"period_requests", "requests", "request_count", "count",
+		"requests_used", "weekly_requests_used", "five_hour_requests_used",
+		"used", "weekly_used", "five_hour_used",
+		"tokens_used", "weekly_tokens_used",
+	}
+
 	var raw map[string]any
 	if err := json.Unmarshal(body, &raw); err != nil {
-		// Cannot parse the response — assume quota is used to avoid accidental warmup.
-		return true
+		// Cannot parse the response — assume quota is NOT used so warmup proceeds.
+		// Skipping a needed warmup defeats the purpose of this endpoint.
+		log.Debugf("codex warmup: cannot parse usage response JSON, assuming fresh quota: %v", err)
+		return false
 	}
 
-	// Check common field names representing request count in the current period.
-	periodFields := []string{"period_requests", "requests", "request_count", "count"}
-	for _, field := range periodFields {
-		if val, ok := raw[field]; ok {
-			n := codexWarmupToFloat64(val)
-			if n == 0 {
-				return false // no requests — quota at 100%
-			}
-			if n > 0 {
-				return true // quota already used
-			}
-		}
+	// Check top-level fields for request-count style responses.
+	if used, determined := extractCodexUsedFromMap(raw, usedCountFields); determined {
+		return used
 	}
 
-	// Also check inside a nested "usage" object.
-	if usageRaw, ok := raw["usage"]; ok {
-		if usageMap, ok := usageRaw.(map[string]any); ok {
-			for _, field := range periodFields {
-				if val, ok := usageMap[field]; ok {
-					n := codexWarmupToFloat64(val)
-					if n == 0 {
-						return false
-					}
-					if n > 0 {
-						return true
-					}
-				}
+	// Check nested objects for multi-period responses, e.g.:
+	//   {"weekly": {"requests": 0, "limit": 100}, "five_hour": {"requests": 0, "limit": 40}}
+	for _, key := range []string{"weekly", "five_hour", "usage", "data", "limits"} {
+		if nested, ok := raw[key].(map[string]any); ok {
+			if used, determined := extractCodexUsedFromMap(nested, usedCountFields); determined {
+				return used
 			}
 		}
 	}
 
-	// Cannot determine usage — assume quota is used to be safe.
-	return true
+	// Cannot determine usage from the response — assume quota is NOT used so warmup proceeds.
+	// Doing an unnecessary warmup consumes at most one request, which is acceptable.
+	// Skipping a needed warmup defeats the entire purpose of this endpoint.
+	log.Debugf("codex warmup: no recognized usage fields in response, assuming fresh quota")
+	return false
+}
+
+// extractCodexUsedFromMap scans m for any field in usedFields.
+// It returns (used bool, determined bool) where determined=true means a conclusion was reached.
+func extractCodexUsedFromMap(m map[string]any, usedFields []string) (used bool, determined bool) {
+	for _, field := range usedFields {
+		val, ok := m[field]
+		if !ok {
+			continue
+		}
+		n := codexWarmupToFloat64(val)
+		if n == 0 {
+			return false, true // no requests consumed — quota at 100%
+		}
+		if n > 0 {
+			return true, true // quota already partially used
+		}
+	}
+	return false, false
 }
 
 func codexWarmupToFloat64(v any) float64 {
