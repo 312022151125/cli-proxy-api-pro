@@ -69,6 +69,14 @@ func containsString(items []string, want string) bool {
 	return false
 }
 
+func TestCodexFreeModelsExcludeGPT55(t *testing.T) {
+	model := findModelInfo(GetCodexFreeModels(), "gpt-5.5")
+	if model != nil {
+		t.Fatal("expected codex free tier to NOT include gpt-5.5")
+	}
+}
+
+
 func TestCodexStaticModelsIncludeGPT55(t *testing.T) {
 	tierModels := map[string][]*ModelInfo{
 		"team": GetCodexTeamModels(),
